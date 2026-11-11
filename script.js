@@ -1,5 +1,5 @@
 // Add your Ghana WhatsApp number before launch: country code + number, digits only (example: 233XXXXXXXXX).
-const WHATSAPP_NUMBER = "";
+const WHATSAPP_NUMBER = "233546553631";
 
 const cart = JSON.parse(sessionStorage.getItem("teaspoonCart") || "[]");
 let selectedCategory = "all";

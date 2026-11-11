@@ -33,6 +33,51 @@ document.querySelectorAll(".metal").forEach((button) => button.addEventListener(
     const active = item === button; item.classList.toggle("active",active); item.setAttribute("aria-pressed",String(active));
   }); updateFilters();
 }));
+
+// The public shop reads active products from Supabase instead of hard-coded samples.
+const productGrid = byId("productGrid");
+const sampleNote = document.querySelector(".sample-note");
+const escapeHtml = (value="") => String(value).replace(/[&<>"']/g, ch => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[ch]));
+function formatPrice(value) {
+  return "GHS " + Number(value || 0).toLocaleString("en-GH", {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+async function loadStoreProducts() {
+  if (!productGrid || !window.supabase || !window.TEASPOON_SUPABASE_URL || !window.TEASPOON_SUPABASE_PUBLISHABLE_KEY) return;
+  productGrid.innerHTML = '<p class="catalog-message">Loading the collection…</p>';
+  const client = window.supabase.createClient(window.TEASPOON_SUPABASE_URL, window.TEASPOON_SUPABASE_PUBLISHABLE_KEY);
+  const { data, error } = await client.from("products")
+    .select("id,name,description,price,metal_type,image_url,is_active,categories(name)")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+  if (error) {
+    productGrid.innerHTML = '<p class="catalog-message">The collection could not be loaded just now. Please try again shortly.</p>';
+    console.error("Teaspoon catalogue error:", error);
+    return;
+  }
+  if (!data || data.length === 0) {
+    productGrid.innerHTML = '<p class="catalog-message">Our collection is being prepared. Please check back soon.</p>';
+    if (sampleNote) sampleNote.hidden = true;
+    return;
+  }
+  productGrid.innerHTML = data.map(product => {
+    const category = product.categories?.name || "Other";
+    const metal = product.metal_type || "Gold";
+    const image = product.image_url
+      ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" loading="lazy">`
+      : "";
+    return `<article class="product-card" data-category="${escapeHtml(category)}" data-metal="${escapeHtml(metal)}">
+      <div class="product-image">${image}<span class="product-tag">${escapeHtml(metal.toUpperCase())}</span></div>
+      <div class="product-info"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(metal)} · ${escapeHtml(category)}</p></div><strong>${formatPrice(product.price)}</strong></div>
+      <button class="add-button" data-name="${escapeHtml(product.name)}" data-price="${Number(product.price)}">ADD TO BAG <span>+</span></button>
+    </article>`;
+  }).join("");
+  if (sampleNote) sampleNote.hidden = true;
+  updateFilters();
+}
+loadStoreProducts();
+
 function money(value){return "GHS "+Number(value).toLocaleString("en-GH");}
 function saveCart(){sessionStorage.setItem("teaspoonCart",JSON.stringify(cart));}
 function renderCart(){
@@ -43,10 +88,12 @@ function renderCart(){
 }
 function openCart(){document.body.classList.add("cart-open");if(byId("cart"))byId("cart").setAttribute("aria-hidden","false");}
 function closeCart(){document.body.classList.remove("cart-open");if(byId("cart"))byId("cart").setAttribute("aria-hidden","true");}
-document.querySelectorAll(".add-button").forEach(button=>button.addEventListener("click",()=>{
+if (byId("productGrid")) byId("productGrid").addEventListener("click", event => {
+ const button = event.target.closest(".add-button");
+ if (!button) return;
  const name=button.dataset.name,price=Number(button.dataset.price),existing=cart.find(item=>item.name===name);
  if(existing)existing.qty++;else cart.push({name,price,qty:1});saveCart();renderCart();openCart();
-}));
+});
 if(byId("cartItems"))byId("cartItems").addEventListener("click",event=>{
  const remove=event.target.closest("[data-remove]");if(!remove)return;cart.splice(Number(remove.dataset.remove),1);saveCart();renderCart();
 });

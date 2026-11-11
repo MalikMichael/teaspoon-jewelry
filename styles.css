@@ -116,3 +116,4 @@ footer a{color:#e9e2d6;text-decoration:none;font:600 14px "Playfair Display",ser
 .enquiry-form .button{margin-top:12px}
 .form-note{color:var(--muted);font-size:10px;line-height:1.7}
 @media(max-width:620px){.story-preview,.story-page-hero{grid-template-columns:1fr}.story-preview .story-image{min-height:320px}.story-page-image{min-height:340px}.story-page-hero .story-copy{padding:42px 7%}.custom-page{background:var(--paper)}.page-heading{margin-bottom:30px}}
+\n/* Live Supabase catalogue images */\n.product-image img{display:block;width:100%;height:100%;object-fit:cover}\n.catalog-message{grid-column:1/-1;padding:35px 0;color:var(--muted);font-size:14px}\n

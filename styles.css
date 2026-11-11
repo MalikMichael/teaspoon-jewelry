@@ -121,3 +121,26 @@ footer a{color:#e9e2d6;text-decoration:none;font:600 14px "Playfair Display",ser
 .product-image{overflow:hidden}
 .product-image img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
 .catalog-message{grid-column:1/-1;padding:35px 0;color:var(--muted);font-size:14px}
+
+/* Footer contact links */
+footer .footer-contact{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+footer .footer-contact a{font:400 9px "DM Sans",sans-serif;letter-spacing:.5px;color:#e9e2d6;text-decoration:none}
+footer .footer-contact a:hover{text-decoration:underline;text-underline-offset:4px}
+footer .footer-contact .contact-link{display:inline-flex;align-items:center;gap:8px}
+footer .footer-contact .contact-icon{width:15px;height:15px;flex:0 0 15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+footer .footer-contact .contact-icon .icon-dot{fill:currentColor;stroke:none}
+@media(max-width:620px){footer{align-items:flex-start;flex-direction:column;gap:14px}footer .footer-contact{align-items:flex-start;flex-direction:column;gap:9px}}
+
+
+/* Refinements: keep contact details readable and give Custom Orders its editorial image panel */
+footer .footer-contact .contact-link span{display:inline!important;visibility:visible!important;opacity:1!important;color:#e9e2d6!important;font:400 10px/1.5 "DM Sans",sans-serif!important;letter-spacing:.35px!important;}
+footer .footer-contact{gap:16px 22px;}
+.custom-page{position:relative;isolation:isolate;overflow:hidden;}
+.custom-page::before{content:"";position:absolute;z-index:-1;top:0;right:0;width:45%;height:100%;background:#e8e1d6 url("https://images.unsplash.com/photo-1617038220319-276d3cfab638?auto=format&fit=crop&w=1400&q=88") center/cover no-repeat;}
+.custom-panel{position:relative;z-index:1;}
+@media(max-width:620px){
+  .custom-page{background:var(--paper);padding-top:0;}
+  .custom-page::before{top:0;right:0;left:0;width:100%;height:190px;background-position:center 48%;}
+  .custom-panel{padding:215px 0 20px;}
+  footer .footer-contact{gap:10px;}
+}

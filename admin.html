@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171612"><title>Admin | Teaspoon Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script><script defer src="admin.js"></script>
+</head>
+<body class="admin-body">
+  <header class="admin-top"><a class="admin-brand" href="index.html"><img src="logo-mark.jpg" alt=""><span>TEASPOON <small>JEWELRY · ADMIN</small></span></a><a href="index.html" class="admin-view-site">View storefront ↗</a></header>
+  <main class="admin-wrap">
+    <section id="loginPanel" class="admin-login">
+      <p class="eyebrow">PRIVATE ADMINISTRATION</p><h1>Welcome back.</h1><p>Sign in to manage Teaspoon Jewelry.</p>
+      <form id="loginForm"><label>Email address<input id="loginEmail" type="email" autocomplete="username" required></label><label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label><button class="button button-dark" type="submit">SIGN IN</button><p id="loginMessage" class="admin-message" role="status"></p></form>
+    </section>
+    <section id="dashboardPanel" hidden>
+      <div class="admin-heading"><div><p class="eyebrow">TEASPOON JEWELRY</p><h1>Admin dashboard</h1><p>Manage your catalogue, stock and customer orders.</p></div><button id="logoutButton" class="admin-outline">Sign out</button></div>
+      <nav class="admin-tabs" aria-label="Admin sections"><button class="selected" data-tab="overview">Overview</button><button data-tab="products">Products</button><button data-tab="inventory">Inventory</button><button data-tab="orders">Orders</button></nav>
+      <p id="globalMessage" class="admin-message" role="status"></p>
+      <section class="admin-section" id="tab-overview"><div class="admin-stats"><article><span>Products</span><strong id="statProducts">—</strong></article><article><span>Active products</span><strong id="statActive">—</strong></article><article><span>Orders</span><strong id="statOrders">—</strong></article><article><span>Pending orders</span><strong id="statPending">—</strong></article></div><div class="admin-panel"><h2>Getting started</h2><p>Add your real products and stock quantities. Your storefront currently contains sample products; this dashboard does not replace them on the public Shop page until we connect the catalogue display in the next update.</p></div></section>
+      <section class="admin-section" id="tab-products" hidden>
+        <div class="admin-panel"><div class="admin-panel-head"><h2 id="productFormTitle">Add a product</h2><button id="cancelEdit" class="admin-outline" hidden>Cancel edit</button></div>
+          <form id="productForm" class="admin-form"><input type="hidden" id="productId"><label>Product name<input id="productName" required maxlength="120"></label><label>Price (GHS)<input id="productPrice" type="number" min="0" step="0.01" required></label><label>Category<select id="productCategory"><option>Necklaces</option><option>Bracelets</option><option>Rings</option><option>Earrings</option><option>Other</option></select></label><label>Metal<select id="productMetal" required><option value="Gold">Gold</option><option value="Silver">Silver</option></select></label><label class="wide">Image URL<input id="productImage" type="url" placeholder="https://..."></label><label class="wide">Description<textarea id="productDescription" rows="3"></textarea></label><label class="check-label"><input id="productActive" type="checkbox" checked> Active on catalogue</label><div class="wide"><button class="button button-dark" type="submit">SAVE PRODUCT</button></div></form>
+        </div><div class="admin-panel"><h2>Your products</h2><div class="admin-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Metal</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody id="productsTable"><tr><td colspan="6">Loading products…</td></tr></tbody></table></div></div>
+      </section>
+      <section class="admin-section" id="tab-inventory" hidden><div class="admin-panel"><h2>Inventory</h2><p class="admin-muted">Set the available quantity for each product.</p><div class="admin-table-wrap"><table><thead><tr><th>Product</th><th>Quantity in stock</th><th>Action</th></tr></thead><tbody id="inventoryTable"><tr><td colspan="3">Loading inventory…</td></tr></tbody></table></div></div></section>
+      <section class="admin-section" id="tab-orders" hidden><div class="admin-panel"><h2>Customer orders</h2><div class="admin-table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Phone</th><th>Total</th><th>Status</th><th>Update</th></tr></thead><tbody id="ordersTable"><tr><td colspan="6">Loading orders…</td></tr></tbody></table></div></div></section>
+    </section>
+  </main>
+</body></html>

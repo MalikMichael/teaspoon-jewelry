@@ -64,6 +64,20 @@ async function loadStoreProducts() {
     if (sampleNote) sampleNote.hidden = true;
     return;
   }
+  // Attach product IDs to older saved cart entries when there is one unambiguous match.
+  let cartUpdated = false;
+  cart.forEach(item => {
+    if (item.productId) return;
+    const matches = data.filter(product =>
+      product.name === item.name && Number(product.price) === Number(item.price)
+    );
+    if (matches.length === 1) {
+      item.productId = matches[0].id;
+      cartUpdated = true;
+    }
+  });
+  if (cartUpdated) saveCart();
+
   productGrid.innerHTML = data.map(product => {
     const category = product.categories?.name || "Other";
     const metal = product.metal_type || "Gold";
@@ -73,7 +87,7 @@ async function loadStoreProducts() {
     return `<article class="product-card" data-category="${escapeHtml(category)}" data-metal="${escapeHtml(metal)}">
       <div class="product-image">${image}<span class="product-tag">${escapeHtml(metal.toUpperCase())}</span></div>
       <div class="product-info"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(metal)} · ${escapeHtml(category)}</p></div><strong>${formatPrice(product.price)}</strong></div>
-      <button class="add-button" data-name="${escapeHtml(product.name)}" data-price="${Number(product.price)}">ADD TO BAG <span>+</span></button>
+      <button class="add-button" data-id="${escapeHtml(product.id)}" data-name="${escapeHtml(product.name)}" data-price="${Number(product.price)}">ADD TO BAG <span>+</span></button>
     </article>`;
   }).join("");
   if (sampleNote) sampleNote.hidden = true;
@@ -92,10 +106,28 @@ function renderCart(){
 function openCart(){document.body.classList.add("cart-open");if(byId("cart"))byId("cart").setAttribute("aria-hidden","false");}
 function closeCart(){document.body.classList.remove("cart-open");if(byId("cart"))byId("cart").setAttribute("aria-hidden","true");}
 if (byId("productGrid")) byId("productGrid").addEventListener("click", event => {
- const button = event.target.closest(".add-button");
- if (!button) return;
- const name=button.dataset.name,price=Number(button.dataset.price),existing=cart.find(item=>item.name===name);
- if(existing)existing.qty++;else cart.push({name,price,qty:1});saveCart();renderCart();openCart();
+  const button = event.target.closest(".add-button");
+  if (!button) return;
+
+  const productId = button.dataset.id;
+  const name = button.dataset.name;
+  const price = Number(button.dataset.price);
+
+  const existing = cart.find(item =>
+    item.productId === productId ||
+    (!item.productId && item.name === name && Number(item.price) === price)
+  );
+
+  if (existing) {
+    existing.productId = productId;
+    existing.qty++;
+  } else {
+    cart.push({productId, name, price, qty:1});
+  }
+
+  saveCart();
+  renderCart();
+  openCart();
 });
 if(byId("cartItems"))byId("cartItems").addEventListener("click",event=>{
  const remove=event.target.closest("[data-remove]");if(!remove)return;cart.splice(Number(remove.dataset.remove),1);saveCart();renderCart();
@@ -113,7 +145,14 @@ if(byId("checkout"))byId("checkout").addEventListener("click", async ()=>{
  const customerPhone = prompt("Please enter your contact number (including country code if outside Ghana):");
  if(!customerPhone || !customerPhone.trim()) return;
   const total=cart.reduce((sum,item)=>sum+item.price*item.qty,0);
+  // Every order item must retain its Supabase product ID for verified reviews.
+  if (cart.some(item => !item.productId)) {
+    alert("One or more items in your bag need to be refreshed. Please remove and add those products again before checkout.");
+    return;
+  }
+
   const orderItems=cart.map(item=>({
+    product_id:item.productId,
     name:item.name,
     price:Number(item.price),
     quantity:Number(item.qty),

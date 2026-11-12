@@ -47,13 +47,66 @@
     if(error){$('inventoryTable').innerHTML=`<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;return;}
     const rows=data||[]; $('inventoryTable').innerHTML=rows.length?rows.map(r=>`<tr><td>${escapeHtml(r.products?.name||'Deleted product')}</td><td><input type="number" min="0" step="1" value="${r.quantity}" id="qty-${r.id}" style="max-width:120px"></td><td><button data-stock="${r.id}">Save</button></td></tr>`).join(''):'<tr><td colspan="3">No stock records yet. Add a product, then inventory can be recorded here.</td></tr>';
   }
-  async function loadOrders(){
-    const {data,error}=await client.from('orders').select('id,customer_name,customer_phone,total_amount,status,created_at').order('created_at',{ascending:false});
-    if(error){$('ordersTable').innerHTML=`<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;return;}
-    orders=data||[]; $('statOrders').textContent=orders.length; $('statPending').textContent=orders.filter(o=>o.status==='Pending').length;
-    const states=['Pending','Confirmed','Processing','Shipped','Delivered','Cancelled'];
-    $('ordersTable').innerHTML=orders.length?orders.map(o=>`<tr><td>${new Date(o.created_at).toLocaleDateString()}</td><td>${escapeHtml(o.customer_name)}</td><td>${escapeHtml(o.customer_phone)}</td><td>${money(o.total_amount)}</td><td>${escapeHtml(o.status)}</td><td><select data-order-status="${o.id}">${states.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select><button data-save-order="${o.id}">Save</button></td></tr>`).join(''):'<tr><td colspan="6">No orders have been received.</td></tr>';
+ 
+async function loadOrders(){
+  const {data,error}=await client.from('orders')
+    .select('id,customer_name,customer_phone,total_amount,status,created_at,items')
+    .order('created_at',{ascending:false});
+
+  if(error){
+    $('ordersTable').innerHTML=`<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;
+    return;
   }
+
+  orders=data||[];
+  $('statOrders').textContent=orders.length;
+  $('statPending').textContent=orders.filter(o=>o.status==='Pending').length;
+
+  const states=['Pending','Confirmed','Processing','Shipped','Delivered','Cancelled'];
+
+  $('ordersTable').innerHTML=orders.length?orders.map(o=>{
+    const items=Array.isArray(o.items)?o.items:[];
+    const itemRows=items.length?items.map(item=>`
+      <tr>
+        <td>${escapeHtml(item.name||item.product_name||'Product')}</td>
+        <td>${Number(item.quantity||1)}</td>
+        <td>${money(item.price||0)}</td>
+      </tr>
+    `).join(''):'<tr><td colspan="3">No item details recorded.</td></tr>';
+
+    const whatsappNumber=String(o.customer_phone||'').replace(/\D/g,'');
+    const whatsappLink=whatsappNumber
+      ? `https://wa.me/${whatsappNumber}`
+      : '#';
+
+    return `
+      <tr>
+        <td>${new Date(o.created_at).toLocaleDateString()}</td>
+        <td>${escapeHtml(o.customer_name)}</td>
+        <td><a href="${whatsappLink}" target="_blank" rel="noopener">${escapeHtml(o.customer_phone)}</a></td>
+        <td>${money(o.total_amount)}</td>
+        <td>${escapeHtml(o.status)}</td>
+        <td>
+          <button type="button" data-view-order="${o.id}">View Details</button>
+          <select data-order-status="${o.id}">
+            ${states.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <button type="button" data-save-order="${o.id}">Save</button>
+        </td>
+      </tr>
+      <tr id="order-details-${o.id}" hidden>
+        <td colspan="6">
+          <strong>Order reference:</strong> ${escapeHtml(o.id)}
+          <table>
+            <thead><tr><th>Item</th><th>Quantity</th><th>Price</th></tr></thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+        </td>
+      </tr>
+    `;
+  }).join(''):'<tr><td colspan="6">No orders have been received.</td></tr>';
+}
+
   $('productForm').addEventListener('submit',async e=>{
     e.preventDefault(); const id=$('productId').value;
     const categoryName=$('productCategory').value;
@@ -72,7 +125,31 @@
     if(edit){const p=products.find(x=>x.id===edit.dataset.edit);if(!p)return;$('productId').value=p.id;$('productName').value=p.name;$('productPrice').value=p.price;$('productCategory').value=p.categories?.name||'Other';$('productMetal').value=p.metal_type||'Gold';$('productImage').value=p.image_url||'';$('productDescription').value=p.description||'';$('productActive').checked=p.is_active;$('productFormTitle').textContent='Edit product';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});}
     if(del&&confirm('Delete this product?')){const {error}=await client.from('products').delete().eq('id',del.dataset.delete);if(error)message(error.message,true);else{message('Product deleted.');await refreshAll();}}
   });
-  $('inventoryTable').addEventListener('click',async e=>{const b=e.target.closest('[data-stock]');if(!b)return;const id=b.dataset.stock;const qty=Number($(`qty-${id}`).value);if(!Number.isInteger(qty)||qty<0){message('Enter a whole number zero or greater.',true);return;}const {error}=await client.from('inventory').update({quantity:qty,updated_at:new Date().toISOString()}).eq('id',id);if(error)message(error.message,true);else message('Stock quantity updated.');});
-  $('ordersTable').addEventListener('click',async e=>{const b=e.target.closest('[data-save-order]');if(!b)return;const id=b.dataset.saveOrder;const status=document.querySelector(`[data-order-status="${id}"]`).value;const {error}=await client.from('orders').update({status}).eq('id',id);if(error)message(error.message,true);else{message('Order status updated.');await loadOrders();}});
-  client.auth.getSession().then(({data})=>showSession(data.session));
+ 
+$('ordersTable').addEventListener('click',async e=>{
+  const viewButton=e.target.closest('[data-view-order]');
+
+  if(viewButton){
+    const details=document.getElementById(
+      `order-details-${viewButton.dataset.viewOrder}`
+    );
+    if(details) details.hidden=!details.hidden;
+    return;
+  }
+
+  const b=e.target.closest('[data-save-order]');
+  if(!b)return;
+
+  const id=b.dataset.saveOrder;
+  const status=document.querySelector(`[data-order-status="${id}"]`).value;
+
+  const {error}=await client.from('orders').update({status}).eq('id',id);
+
+  if(error)message(error.message,true);
+  else{
+    message('Order status updated.');
+    await loadOrders();
+  }
+});
+
 })();

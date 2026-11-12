@@ -112,29 +112,56 @@ if(byId("checkout"))byId("checkout").addEventListener("click", async ()=>{
  if(!customerName || !customerName.trim()) return;
  const customerPhone = prompt("Please enter your contact number (including country code if outside Ghana):");
  if(!customerPhone || !customerPhone.trim()) return;
- const total=cart.reduce((sum,item)=>sum+item.price*item.qty,0);
- const orderItems=cart.map(item=>({name:item.name,price:Number(item.price),quantity:Number(item.qty),line_total:Number(item.price)*Number(item.qty)}));
- const lines=cart.map(item=>`${item.qty} × ${item.name} — ${money(item.price*item.qty)}`);
- const message=`Hello Teaspoon Jewelry, I would like to place this order.\nOrder reference: will be provided after submission\nCustomer: ${customerName.trim()}\nContact: ${customerPhone.trim()}\n${lines.join("\n")}\nSubtotal: ${money(total)}\nPlease confirm availability and delivery.`;
- const whatsappWindow=window.open("about:blank","_blank");
- try {
-   const {data,error}=await supabaseClient.from("orders").insert({
-     customer_name:customerName.trim(),
-     customer_phone:customerPhone.trim(),
-     total_amount:total,
-     items:orderItems,
-     status:"Pending"
-   }).select("id").single();
-   if(error) throw error;
-   const orderMessage=message.replace("will be provided after submission",data.id);
-   if(whatsappWindow) whatsappWindow.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
-   else window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
-   cart.length=0;saveCart();renderCart();closeCart();
- } catch(error) {
-   if(whatsappWindow) whatsappWindow.close();
-   console.error("Order submission failed:",error);
-   alert("Your order could not be saved. Please try again. If the problem continues, contact us on WhatsApp.");
- }
+  const total=cart.reduce((sum,item)=>sum+item.price*item.qty,0);
+  const orderItems=cart.map(item=>({
+    name:item.name,
+    price:Number(item.price),
+    quantity:Number(item.qty),
+    line_total:Number(item.price)*Number(item.qty)
+  }));
+
+  const orderReference = crypto.randomUUID();
+
+  const lines=cart.map(item=>`${item.qty} × ${item.name} — ${money(item.price*item.qty)}`);
+
+  const orderMessage=`Hello Teaspoon Jewelry, I would like to place this order.
+Order reference: ${orderReference}
+Customer: ${customerName.trim()}
+Contact: ${customerPhone.trim()}
+${lines.join("\n")}
+Subtotal: ${money(total)}
+Please confirm availability and delivery.`;
+
+  const whatsappWindow=window.open("about:blank","_blank");
+
+  try {
+    const {error}=await supabaseClient.from("orders").insert({
+      id:orderReference,
+      customer_name:customerName.trim(),
+      customer_phone:customerPhone.trim(),
+      total_amount:total,
+      items:orderItems,
+      status:"Pending"
+    });
+
+    if(error) throw error;
+
+    if(whatsappWindow) {
+      whatsappWindow.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
+    } else {
+      window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
+    }
+
+    cart.length=0;
+    saveCart();
+    renderCart();
+    closeCart();
+
+  } catch(error) {
+    if(whatsappWindow) whatsappWindow.close();
+    console.error("Order submission failed:",error);
+    alert("Your order could not be saved. Please try again. If the problem continues, contact us on WhatsApp.");
+  }
 });
 if(byId("menuToggle"))byId("menuToggle").addEventListener("click",()=>{
  const nav=byId("nav"),isOpen=nav.classList.toggle("open");

@@ -37,6 +37,9 @@ document.querySelectorAll(".metal").forEach((button) => button.addEventListener(
 // The public shop reads active products from Supabase instead of hard-coded samples.
 const productGrid = byId("productGrid");
 const sampleNote = document.querySelector(".sample-note");
+const supabaseClient = (window.supabase && window.TEASPOON_SUPABASE_URL && window.TEASPOON_SUPABASE_PUBLISHABLE_KEY)
+  ? window.supabase.createClient(window.TEASPOON_SUPABASE_URL, window.TEASPOON_SUPABASE_PUBLISHABLE_KEY)
+  : null;
 const escapeHtml = (value="") => String(value).replace(/[&<>"']/g, ch => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[ch]));
@@ -46,7 +49,7 @@ function formatPrice(value) {
 async function loadStoreProducts() {
   if (!productGrid || !window.supabase || !window.TEASPOON_SUPABASE_URL || !window.TEASPOON_SUPABASE_PUBLISHABLE_KEY) return;
   productGrid.innerHTML = '<p class="catalog-message">Loading the collection…</p>';
-  const client = window.supabase.createClient(window.TEASPOON_SUPABASE_URL, window.TEASPOON_SUPABASE_PUBLISHABLE_KEY);
+  const client = supabaseClient;
   const { data, error } = await client.from("products")
     .select("id,name,description,price,metal_type,image_url,is_active,categories(name)")
     .eq("is_active", true)
@@ -101,13 +104,37 @@ if(byId("openCart"))byId("openCart").addEventListener("click",openCart);
 if(byId("closeCart"))byId("closeCart").addEventListener("click",closeCart);
 if(byId("shade"))byId("shade").addEventListener("click",closeCart);
 document.addEventListener("keydown",event=>{if(event.key==="Escape")closeCart();});
-if(byId("checkout"))byId("checkout").addEventListener("click",()=>{
+if(byId("checkout"))byId("checkout").addEventListener("click", async ()=>{
  if(!cart.length){alert("Your bag is empty. Add a product first.");return;}
- if(!WHATSAPP_NUMBER){alert("The shopping bag is working. We will connect your business WhatsApp number before launch.");return;}
+ if(!WHATSAPP_NUMBER){alert("WhatsApp checkout is not configured yet.");return;}
+ if(!supabaseClient){alert("We cannot connect to the order system right now. Please try again shortly.");return;}
+ const customerName = prompt("Please enter your full name:");
+ if(!customerName || !customerName.trim()) return;
+ const customerPhone = prompt("Please enter your contact number (including country code if outside Ghana):");
+ if(!customerPhone || !customerPhone.trim()) return;
  const total=cart.reduce((sum,item)=>sum+item.price*item.qty,0);
+ const orderItems=cart.map(item=>({name:item.name,price:Number(item.price),quantity:Number(item.qty),line_total:Number(item.price)*Number(item.qty)}));
  const lines=cart.map(item=>`${item.qty} × ${item.name} — ${money(item.price*item.qty)}`);
- const message=`Hello Teaspoon Jewelry, I would like to enquire about this order:\n${lines.join("\n")}\nSubtotal: ${money(total)}\nPlease confirm availability and delivery.`;
- window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,"_blank","noopener,noreferrer");
+ const message=`Hello Teaspoon Jewelry, I would like to place this order.\nOrder reference: will be provided after submission\nCustomer: ${customerName.trim()}\nContact: ${customerPhone.trim()}\n${lines.join("\n")}\nSubtotal: ${money(total)}\nPlease confirm availability and delivery.`;
+ const whatsappWindow=window.open("about:blank","_blank");
+ try {
+   const {data,error}=await supabaseClient.from("orders").insert({
+     customer_name:customerName.trim(),
+     customer_phone:customerPhone.trim(),
+     total_amount:total,
+     items:orderItems,
+     status:"Pending"
+   }).select("id").single();
+   if(error) throw error;
+   const orderMessage=message.replace("will be provided after submission",data.id);
+   if(whatsappWindow) whatsappWindow.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
+   else window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
+   cart.length=0;saveCart();renderCart();closeCart();
+ } catch(error) {
+   if(whatsappWindow) whatsappWindow.close();
+   console.error("Order submission failed:",error);
+   alert("Your order could not be saved. Please try again. If the problem continues, contact us on WhatsApp.");
+ }
 });
 if(byId("menuToggle"))byId("menuToggle").addEventListener("click",()=>{
  const nav=byId("nav"),isOpen=nav.classList.toggle("open");

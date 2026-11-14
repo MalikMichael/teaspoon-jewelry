@@ -1,24 +1,21 @@
-TEASPOON JEWELRY — CUSTOMER REVIEW UPDATE
+TEASPOON JEWELRY — PUBLIC REVIEW DISPLAY UPDATE
 
-Files in this package:
-- review.html (new customer review page)
-- review.js (calls the two deployed Supabase Edge Functions)
-- admin.html (adds the Reviews tab)
-- admin.js (loads reviews and lets an admin approve/reject them)
-- shop.html (adds a Reviews navigation/footer link)
+Upload/replace these four files in the repository root:
+- shop.html
+- script.js
+- product.html (new)
+- product.js (new)
 
-INSTALLATION
-1. Open your GitHub repository: teaspoon-jewelry.
-2. Upload the four updated/new files from this package to the repository root:
-   admin.html, admin.js, shop.html, review.html, review.js
-3. Commit the changes to the main branch. Vercel should deploy automatically.
-4. Open the live site and test /review.html after deployment.
-5. Sign in to /admin.html and open the Reviews tab to moderate submissions.
+This update:
+- Adds average star rating and approved-review count to each product card on the Shop page.
+- Adds a product detail page linked from each card.
+- Displays approved reviews and average rating on each product detail page.
+- Keeps Pending and Rejected reviews hidden by querying only status = Approved.
+- Keeps the existing review page link in the Shop navigation/footer.
 
-IMPORTANT
-- Keep your existing supabase-config.js. Do not replace it with another key.
-- Do not put the Supabase secret/service-role key in website files.
-- The Edge Functions lookup-delivered-order and submit-review must already be deployed.
-- Reviews are inserted as Pending and are not publicly visible until approved.
-- The current package adds review submission and moderation. It does not yet display approved reviews on product cards/product detail pages.
-- For testing, ensure the test order has a non-empty customer_name because reviews.customer_name is required.
+IMPORTANT:
+- Keep the existing supabase-config.js unchanged.
+- Do not put any Supabase secret/service-role key in frontend files.
+- The public reviews SELECT policy must allow only Approved rows, as configured earlier.
+- This update displays approved review text under the generic label "Verified customer"; it does not expose customer names.
+- It does not change checkout, orders, or admin moderation.

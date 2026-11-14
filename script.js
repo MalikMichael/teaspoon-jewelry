@@ -64,30 +64,35 @@ async function loadStoreProducts() {
     if (sampleNote) sampleNote.hidden = true;
     return;
   }
-  // Attach product IDs to older saved cart entries when there is one unambiguous match.
-  let cartUpdated = false;
-  cart.forEach(item => {
-    if (item.productId) return;
-    const matches = data.filter(product =>
-      product.name === item.name && Number(product.price) === Number(item.price)
-    );
-    if (matches.length === 1) {
-      item.productId = matches[0].id;
-      cartUpdated = true;
-    }
+  const { data: approvedReviews, error: reviewError } = await client.from("reviews")
+    .select("product_id,rating")
+    .eq("status", "Approved");
+  if (reviewError) console.warn("Teaspoon review summaries unavailable:", reviewError);
+  const reviewStats = {};
+  (approvedReviews || []).forEach(review => {
+    const key = review.product_id;
+    if (!reviewStats[key]) reviewStats[key] = { total: 0, count: 0 };
+    reviewStats[key].total += Number(review.rating) || 0;
+    reviewStats[key].count += 1;
   });
-  if (cartUpdated) saveCart();
 
   productGrid.innerHTML = data.map(product => {
     const category = product.categories?.name || "Other";
     const metal = product.metal_type || "Gold";
+    const stats = reviewStats[product.id] || { total: 0, count: 0 };
+    const average = stats.count ? (stats.total / stats.count) : 0;
+    const ratingMarkup = stats.count
+      ? `<div class="product-rating-summary"><span class="stars" aria-label="${average.toFixed(1)} out of 5 stars">${"★".repeat(Math.round(average))}${"☆".repeat(5-Math.round(average))}</span><span>${average.toFixed(1)} (${stats.count} ${stats.count === 1 ? "review" : "reviews"})</span></div>`
+      : `<div class="product-rating-summary">No reviews yet</div>`;
     const image = product.image_url
       ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" loading="lazy">`
       : "";
     return `<article class="product-card" data-category="${escapeHtml(category)}" data-metal="${escapeHtml(metal)}">
+      <a class="product-detail-link" href="product.html?id=${encodeURIComponent(product.id)}" aria-label="View ${escapeHtml(product.name)} details">VIEW DETAILS</a>
       <div class="product-image">${image}<span class="product-tag">${escapeHtml(metal.toUpperCase())}</span></div>
       <div class="product-info"><div><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(metal)} · ${escapeHtml(category)}</p></div><strong>${formatPrice(product.price)}</strong></div>
-      <button class="add-button" data-id="${escapeHtml(product.id)}" data-name="${escapeHtml(product.name)}" data-price="${Number(product.price)}">ADD TO BAG <span>+</span></button>
+      ${ratingMarkup}
+      <button class="add-button" data-name="${escapeHtml(product.name)}" data-price="${Number(product.price)}">ADD TO BAG <span>+</span></button>
     </article>`;
   }).join("");
   if (sampleNote) sampleNote.hidden = true;
@@ -106,28 +111,10 @@ function renderCart(){
 function openCart(){document.body.classList.add("cart-open");if(byId("cart"))byId("cart").setAttribute("aria-hidden","false");}
 function closeCart(){document.body.classList.remove("cart-open");if(byId("cart"))byId("cart").setAttribute("aria-hidden","true");}
 if (byId("productGrid")) byId("productGrid").addEventListener("click", event => {
-  const button = event.target.closest(".add-button");
-  if (!button) return;
-
-  const productId = button.dataset.id;
-  const name = button.dataset.name;
-  const price = Number(button.dataset.price);
-
-  const existing = cart.find(item =>
-    item.productId === productId ||
-    (!item.productId && item.name === name && Number(item.price) === price)
-  );
-
-  if (existing) {
-    existing.productId = productId;
-    existing.qty++;
-  } else {
-    cart.push({productId, name, price, qty:1});
-  }
-
-  saveCart();
-  renderCart();
-  openCart();
+ const button = event.target.closest(".add-button");
+ if (!button) return;
+ const name=button.dataset.name,price=Number(button.dataset.price),existing=cart.find(item=>item.name===name);
+ if(existing)existing.qty++;else cart.push({name,price,qty:1});saveCart();renderCart();openCart();
 });
 if(byId("cartItems"))byId("cartItems").addEventListener("click",event=>{
  const remove=event.target.closest("[data-remove]");if(!remove)return;cart.splice(Number(remove.dataset.remove),1);saveCart();renderCart();
@@ -144,63 +131,29 @@ if(byId("checkout"))byId("checkout").addEventListener("click", async ()=>{
  if(!customerName || !customerName.trim()) return;
  const customerPhone = prompt("Please enter your contact number (including country code if outside Ghana):");
  if(!customerPhone || !customerPhone.trim()) return;
-  const total=cart.reduce((sum,item)=>sum+item.price*item.qty,0);
-  // Every order item must retain its Supabase product ID for verified reviews.
-  if (cart.some(item => !item.productId)) {
-    alert("One or more items in your bag need to be refreshed. Please remove and add those products again before checkout.");
-    return;
-  }
-
-  const orderItems=cart.map(item=>({
-    product_id:item.productId,
-    name:item.name,
-    price:Number(item.price),
-    quantity:Number(item.qty),
-    line_total:Number(item.price)*Number(item.qty)
-  }));
-
-  const orderReference = crypto.randomUUID();
-
-  const lines=cart.map(item=>`${item.qty} × ${item.name} — ${money(item.price*item.qty)}`);
-
-  const orderMessage=`Hello Teaspoon Jewelry, I would like to place this order.
-Order reference: ${orderReference}
-Customer: ${customerName.trim()}
-Contact: ${customerPhone.trim()}
-${lines.join("\n")}
-Subtotal: ${money(total)}
-Please confirm availability and delivery.`;
-
-  const whatsappWindow=window.open("about:blank","_blank");
-
-  try {
-    const {error}=await supabaseClient.from("orders").insert({
-      id:orderReference,
-      customer_name:customerName.trim(),
-      customer_phone:customerPhone.trim(),
-      total_amount:total,
-      items:orderItems,
-      status:"Pending"
-    });
-
-    if(error) throw error;
-
-    if(whatsappWindow) {
-      whatsappWindow.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
-    } else {
-      window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
-    }
-
-    cart.length=0;
-    saveCart();
-    renderCart();
-    closeCart();
-
-  } catch(error) {
-    if(whatsappWindow) whatsappWindow.close();
-    console.error("Order submission failed:",error);
-    alert("Your order could not be saved. Please try again. If the problem continues, contact us on WhatsApp.");
-  }
+ const total=cart.reduce((sum,item)=>sum+item.price*item.qty,0);
+ const orderItems=cart.map(item=>({name:item.name,price:Number(item.price),quantity:Number(item.qty),line_total:Number(item.price)*Number(item.qty)}));
+ const lines=cart.map(item=>`${item.qty} × ${item.name} — ${money(item.price*item.qty)}`);
+ const message=`Hello Teaspoon Jewelry, I would like to place this order.\nOrder reference: will be provided after submission\nCustomer: ${customerName.trim()}\nContact: ${customerPhone.trim()}\n${lines.join("\n")}\nSubtotal: ${money(total)}\nPlease confirm availability and delivery.`;
+ const whatsappWindow=window.open("about:blank","_blank");
+ try {
+   const {data,error}=await supabaseClient.from("orders").insert({
+     customer_name:customerName.trim(),
+     customer_phone:customerPhone.trim(),
+     total_amount:total,
+     items:orderItems,
+     status:"Pending"
+   }).select("id").single();
+   if(error) throw error;
+   const orderMessage=message.replace("will be provided after submission",data.id);
+   if(whatsappWindow) whatsappWindow.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
+   else window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
+   cart.length=0;saveCart();renderCart();closeCart();
+ } catch(error) {
+   if(whatsappWindow) whatsappWindow.close();
+   console.error("Order submission failed:",error);
+   alert("Your order could not be saved. Please try again. If the problem continues, contact us on WhatsApp.");
+ }
 });
 if(byId("menuToggle"))byId("menuToggle").addEventListener("click",()=>{
  const nav=byId("nav"),isOpen=nav.classList.toggle("open");

@@ -18,7 +18,7 @@
     </section>
     <section id="dashboardPanel" hidden>
       <div class="admin-heading"><div><p class="eyebrow">TEASPOON JEWELRY</p><h1>Admin dashboard</h1><p>Manage your catalogue, stock and customer orders.</p></div><button id="logoutButton" class="admin-outline">Sign out</button></div>
-      <nav class="admin-tabs" aria-label="Admin sections"><button class="selected" data-tab="overview">Overview</button><button data-tab="products">Products</button><button data-tab="inventory">Inventory</button><button data-tab="orders">Orders</button></nav>
+      <nav class="admin-tabs" aria-label="Admin sections"><button class="selected" data-tab="overview">Overview</button><button data-tab="products">Products</button><button data-tab="inventory">Inventory</button><button data-tab="orders">Orders</button><button data-tab="reviews">Reviews</button></nav>
       <p id="globalMessage" class="admin-message" role="status"></p>
       <section class="admin-section" id="tab-overview"><div class="admin-stats"><article><span>Products</span><strong id="statProducts">—</strong></article><article><span>Active products</span><strong id="statActive">—</strong></article><article><span>Orders</span><strong id="statOrders">—</strong></article><article><span>Pending orders</span><strong id="statPending">—</strong></article></div><div class="admin-panel"><h2>Getting started</h2><p>Add your real products and stock quantities. Your storefront currently contains sample products; this dashboard does not replace them on the public Shop page until we connect the catalogue display in the next update.</p></div></section>
       <section class="admin-section" id="tab-products" hidden>
@@ -28,6 +28,18 @@
       </section>
       <section class="admin-section" id="tab-inventory" hidden><div class="admin-panel"><h2>Inventory</h2><p class="admin-muted">Set the available quantity for each product.</p><div class="admin-table-wrap"><table><thead><tr><th>Product</th><th>Quantity in stock</th><th>Action</th></tr></thead><tbody id="inventoryTable"><tr><td colspan="3">Loading inventory…</td></tr></tbody></table></div></div></section>
       <section class="admin-section" id="tab-orders" hidden><div class="admin-panel"><h2>Customer orders</h2><div class="admin-table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Phone</th><th>Total</th><th>Status</th><th>Update</th></tr></thead><tbody id="ordersTable"><tr><td colspan="6">Loading orders…</td></tr></tbody></table></div></div></section>
+      <section class="admin-section" id="tab-reviews" hidden>
+        <div class="admin-panel">
+          <h2>Customer reviews</h2>
+          <p class="admin-muted">Review submissions remain hidden from customers until you approve them.</p>
+          <div class="admin-table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Customer</th><th>Product</th><th>Rating</th><th>Comment</th><th>Status</th><th>Moderation</th></tr></thead>
+              <tbody id="reviewsTable"><tr><td colspan="7">Reviews will appear here.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
 </body></html>

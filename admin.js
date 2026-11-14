@@ -1,7 +1,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const client = window.supabase.createClient(window.TEASPOON_SUPABASE_URL, window.TEASPOON_SUPABASE_PUBLISHABLE_KEY);
-  let products = [], orders = [];
+  let products = [], orders = [], reviews = [];
   const money = (n) => `GHS ${Number(n || 0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
   const message = (text, error=false) => { $('globalMessage').textContent = text; $('globalMessage').style.color = error ? '#8b3b2f' : '#285b35'; };
   const escapeHtml = (s='') => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -35,7 +35,7 @@
     document.querySelectorAll('.admin-tabs button').forEach(b=>b.classList.toggle('selected',b===btn));
     document.querySelectorAll('.admin-section').forEach(sec=>sec.hidden=sec.id!==`tab-${btn.dataset.tab}`);
   }));
-  async function refreshAll(){ await Promise.all([loadProducts(),loadOrders()]); await loadInventory(); }
+  async function refreshAll(){ await Promise.all([loadProducts(),loadOrders(),loadReviews()]); await loadInventory(); }
   async function loadProducts(){
     const {data,error}=await client.from('products').select('id,name,description,price,metal_type,image_url,is_active,category_id,categories(name)').order('created_at',{ascending:false});
     if(error){message(`Products: ${error.message}`,true);$('productsTable').innerHTML='<tr><td colspan="6">Could not load products.</td></tr>';return;}
@@ -106,6 +106,47 @@ async function loadOrders(){
     `;
   }).join(''):'<tr><td colspan="6">No orders have been received.</td></tr>';
 }
+
+
+  async function loadReviews(){
+    const {data,error}=await client.from('reviews')
+      .select('id,order_id,product_id,customer_name,rating,comment,status,created_at,products(name)')
+      .order('created_at',{ascending:false});
+    if(error){
+      $('reviewsTable').innerHTML=`<tr><td colspan="7">${escapeHtml(error.message)}</td></tr>`;
+      return;
+    }
+    reviews=data||[];
+    $('reviewsTable').innerHTML=reviews.length?reviews.map(r=>`
+      <tr>
+        <td>${new Date(r.created_at).toLocaleDateString()}</td>
+        <td>${escapeHtml(r.customer_name||'Verified customer')}</td>
+        <td>${escapeHtml(r.products?.name||'Product unavailable')}</td>
+        <td>${'★'.repeat(Number(r.rating)||0)}${'☆'.repeat(5-(Number(r.rating)||0))}</td>
+        <td>${escapeHtml(r.comment||'—')}</td>
+        <td><span class="status-pill ${r.status==='Approved'?'active':''}">${escapeHtml(r.status)}</span></td>
+        <td>
+          <button type="button" data-review-status="Approved" data-review-id="${r.id}">Approve</button>
+          <button type="button" data-review-status="Rejected" data-review-id="${r.id}">Reject</button>
+        </td>
+      </tr>`).join(''):'<tr><td colspan="7">No reviews have been submitted yet.</td></tr>';
+  }
+
+  $('reviewsTable').addEventListener('click',async e=>{
+    const button=e.target.closest('[data-review-status]');
+    if(!button)return;
+    const reviewId=button.dataset.reviewId;
+    const newStatus=button.dataset.reviewStatus;
+    button.disabled=true;
+    const {error}=await client.from('reviews').update({status:newStatus}).eq('id',reviewId);
+    if(error){
+      message(`Could not update review: ${error.message}`,true);
+      button.disabled=false;
+      return;
+    }
+    message(`Review ${newStatus.toLowerCase()}.`);
+    await loadReviews();
+  });
 
   $('productForm').addEventListener('submit',async e=>{
     e.preventDefault(); const id=$('productId').value;

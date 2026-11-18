@@ -144,8 +144,9 @@ function ensureCheckoutModal() {
     .ts-checkout-summary-total{border-top:1px solid #d5cabb;margin-top:8px;padding-top:11px;font-weight:700}
     .ts-checkout-field{display:block;margin:0 0 16px}
     .ts-checkout-field span{display:block;font-size:11px;font-weight:600;margin:0 0 7px;color:#34312b}
-    .ts-checkout-field input{display:block;width:100%;box-sizing:border-box;border:1px solid #d7cec0;border-radius:0;background:#fffdfa;color:#25231f;padding:14px 13px;font:inherit;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
-    .ts-checkout-field input:focus{border-color:#a47a43;box-shadow:0 0 0 3px rgba(164,122,67,.13)}
+    .ts-checkout-field input,.ts-checkout-field select,.ts-checkout-field textarea{display:block;width:100%;box-sizing:border-box;border:1px solid #d7cec0;border-radius:0;background:#fffdfa;color:#25231f;padding:14px 13px;font:inherit;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+    .ts-checkout-field textarea{min-height:90px;resize:vertical}
+    .ts-checkout-field input:focus,.ts-checkout-field select:focus,.ts-checkout-field textarea:focus{border-color:#a47a43;box-shadow:0 0 0 3px rgba(164,122,67,.13)}
     .ts-checkout-field input[aria-invalid="true"]{border-color:#a94335}
     .ts-checkout-help{display:block;margin-top:6px;font-size:10px;color:#81786c;line-height:1.5}
     .ts-checkout-error{min-height:18px;margin:0 0 10px;color:#a94335;font-size:12px;line-height:1.5}
@@ -173,6 +174,11 @@ function ensureCheckoutModal() {
       <form id="tsCheckoutForm" novalidate>
         <label class="ts-checkout-field"><span>Full name</span><input id="tsCustomerName" name="customerName" type="text" autocomplete="name" maxlength="120" placeholder="Enter your full name" required></label>
         <label class="ts-checkout-field"><span>Contact number</span><input id="tsCustomerPhone" name="customerPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="24" placeholder="e.g. 054 655 3631" required><small class="ts-checkout-help">Ghana numbers are welcome. If you are outside Ghana, include your country code.</small></label>
+        <label class="ts-checkout-field"><span>Region</span><select id="tsDeliveryRegion" name="deliveryRegion" required><option value="">Select your region</option><option value="Greater Accra">Greater Accra</option><option value="Volta">Volta</option><option value="Other">Other region</option></select></label>
+        <label class="ts-checkout-field"><span>Town / Community</span><input id="tsDeliveryTown" name="deliveryTown" maxlength="120" placeholder="e.g. Ho, Adenta, Madina" required></label>
+        <label class="ts-checkout-field"><span>Full delivery address</span><textarea id="tsDeliveryAddress" name="deliveryAddress" maxlength="500" placeholder="House number, street, landmark, etc." required></textarea></label>
+        <label class="ts-checkout-field"><span>Payment preference</span><select id="tsPaymentMethod" name="paymentMethod" required><option value="">Choose payment method</option><option value="manual_momo">MTN Mobile Money (pay before delivery)</option><option value="payment_on_delivery">Request payment on delivery</option></select><small class="ts-checkout-help">Payment on delivery is available by request in Greater Accra and Volta Region, subject to address and delivery confirmation.</small></label>
+        <div id="tsMomoInstructions" class="ts-checkout-summary" hidden><p class="ts-checkout-summary-title">Manual MTN Mobile Money</p><div class="ts-checkout-summary-line"><span>Number</span><strong>054 655 3631</strong></div><div class="ts-checkout-summary-line"><span>Account name</span><strong>Michael</strong></div><p class="ts-checkout-help">Please pay the order total to this number. We will verify payment before confirming your order.</p></div>
         <p class="ts-checkout-error" id="tsCheckoutError" role="alert" aria-live="polite"></p>
         <div class="ts-checkout-actions"><button class="ts-checkout-cancel" type="button" id="tsCheckoutCancel">Cancel</button><button class="ts-checkout-submit" type="submit" id="tsCheckoutSubmit">Continue to WhatsApp <span aria-hidden="true">↗</span></button></div>
       </form>
@@ -192,6 +198,7 @@ function ensureCheckoutModal() {
     if (event.key === "Escape" && overlay.classList.contains("is-open")) close();
   });
   byId("tsCheckoutForm").addEventListener("submit", submitCheckoutDetails);
+  byId("tsPaymentMethod").addEventListener("change", () => { byId("tsMomoInstructions").hidden = byId("tsPaymentMethod").value !== "manual_momo"; });
 }
 
 function openCheckoutModal() {
@@ -201,10 +208,10 @@ function openCheckoutModal() {
     ${cart.map(item => `<div class="ts-checkout-summary-line"><span>${escapeHtml(item.qty)} × ${escapeHtml(item.name)}</span><strong>${money(item.price * item.qty)}</strong></div>`).join("")}
     <div class="ts-checkout-summary-line ts-checkout-summary-total"><span>Subtotal</span><strong>${money(total)}</strong></div>`;
   byId("tsCheckoutError").textContent = "";
-  byId("tsCustomerName").value = "";
-  byId("tsCustomerPhone").value = "";
-  byId("tsCustomerName").removeAttribute("aria-invalid");
-  byId("tsCustomerPhone").removeAttribute("aria-invalid");
+  ["tsCustomerName","tsCustomerPhone","tsDeliveryTown","tsDeliveryAddress"].forEach(id => { byId(id).value = ""; byId(id).removeAttribute("aria-invalid"); });
+  byId("tsDeliveryRegion").value = "";
+  byId("tsPaymentMethod").value = "";
+  byId("tsMomoInstructions").hidden = true;
   const modal = byId("checkoutModal");
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
@@ -220,24 +227,21 @@ async function submitCheckoutDetails(event) {
   const submitButton = byId("tsCheckoutSubmit");
   const customerName = nameInput.value.trim();
   const customerPhone = phoneInput.value.trim();
+  const deliveryRegion = byId("tsDeliveryRegion").value;
+  const deliveryTown = byId("tsDeliveryTown").value.trim();
+  const deliveryAddress = byId("tsDeliveryAddress").value.trim();
+  const paymentMethod = byId("tsPaymentMethod").value;
 
   nameInput.removeAttribute("aria-invalid");
   phoneInput.removeAttribute("aria-invalid");
   errorBox.textContent = "";
 
-  if (customerName.length < 2) {
-    nameInput.setAttribute("aria-invalid", "true");
-    errorBox.textContent = "Please enter your full name.";
-    nameInput.focus();
-    return;
-  }
+  if (customerName.length < 2) { nameInput.setAttribute("aria-invalid", "true"); errorBox.textContent = "Please enter your full name."; nameInput.focus(); return; }
   const phoneDigits = customerPhone.replace(/\D/g, "");
-  if (phoneDigits.length < 9 || phoneDigits.length > 15) {
-    phoneInput.setAttribute("aria-invalid", "true");
-    errorBox.textContent = "Please enter a valid contact number, including your country code if needed.";
-    phoneInput.focus();
-    return;
-  }
+  if (phoneDigits.length < 9 || phoneDigits.length > 15) { phoneInput.setAttribute("aria-invalid", "true"); errorBox.textContent = "Please enter a valid contact number, including your country code if needed."; phoneInput.focus(); return; }
+  if (!deliveryRegion || deliveryTown.length < 2 || deliveryAddress.length < 5) { errorBox.textContent = "Please complete your delivery region, town/community, and full address."; return; }
+  if (!paymentMethod) { errorBox.textContent = "Please choose a payment preference."; byId("tsPaymentMethod").focus(); return; }
+  if (paymentMethod === "payment_on_delivery" && !["Greater Accra","Volta"].includes(deliveryRegion)) { errorBox.textContent = "Payment on delivery is available by request only in Greater Accra and Volta Region. Please select MTN Mobile Money or contact us."; byId("tsPaymentMethod").focus(); return; }
   if (!cart.length) { errorBox.textContent = "Your bag is empty. Add a product before checking out."; return; }
   if (!WHATSAPP_NUMBER) { errorBox.textContent = "WhatsApp checkout is not configured yet."; return; }
   if (!supabaseClient) { errorBox.textContent = "We cannot connect to the order system right now. Please try again shortly."; return; }
@@ -245,31 +249,35 @@ async function submitCheckoutDetails(event) {
   const total = cart.reduce((sum,item) => sum + item.price * item.qty, 0);
   const orderItems = cart.map(item => ({name:item.name,price:Number(item.price),quantity:Number(item.qty),line_total:Number(item.price)*Number(item.qty)}));
   const lines = cart.map(item => `${item.qty} × ${item.name} — ${money(item.price*item.qty)}`);
-  const message = `Hello Teaspoon Jewelry, I would like to place this order.\nOrder reference: will be provided after submission\nCustomer: ${customerName}\nContact: ${customerPhone}\n${lines.join("\n")}\nSubtotal: ${money(total)}\nPlease confirm availability and delivery.`;
+  const paymentLabel = paymentMethod === "manual_momo" ? "MTN Mobile Money (payment before delivery)" : "Payment on delivery requested";
+  const message = `Hello Teaspoon Jewelry, I would like to place this order.\nOrder reference: will be provided after submission\nCustomer: ${customerName}\nContact: ${customerPhone}\nDelivery region: ${deliveryRegion}\nTown/Community: ${deliveryTown}\nDelivery address: ${deliveryAddress}\nPayment preference: ${paymentLabel}\n${lines.join("\n")}\nSubtotal: ${money(total)}\nPlease confirm availability, payment and delivery.`;
 
   const whatsappWindow = window.open("about:blank", "_blank");
   submitButton.disabled = true;
   submitButton.textContent = "PREPARING YOUR ORDER…";
-
   try {
     const {data,error} = await supabaseClient.from("orders").insert({
       customer_name:customerName,
       customer_phone:customerPhone,
       total_amount:total,
       items:orderItems,
-      status:"Pending"
+      status:"Pending",
+      delivery_region:deliveryRegion,
+      delivery_town:deliveryTown,
+      delivery_address:deliveryAddress,
+      payment_method:paymentMethod,
+      payment_status:paymentMethod === "manual_momo" ? "Awaiting Payment" : "Payment on Delivery Requested",
+      amount_paid:0,
+      balance_due:total
     }).select("id").single();
     if (error) throw error;
 
-    const orderMessage = message.replace("will be provided after submission", data.id);
+    let orderMessage = message.replace("will be provided after submission", data.id);
+    if (paymentMethod === "manual_momo") orderMessage += `\n\nMTN MoMo payment details:\nNumber: 054 655 3631\nName: Michael\nPlease send payment and share the transaction confirmation for verification.`;
     const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderMessage)}`;
     if (whatsappWindow) whatsappWindow.location.href = whatsappUrl;
     else window.location.href = whatsappUrl;
-
-    cart.length = 0;
-    saveCart();
-    renderCart();
-    closeCart();
+    cart.length = 0; saveCart(); renderCart(); closeCart();
     byId("checkoutModal").classList.remove("is-open");
     byId("checkoutModal").setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
